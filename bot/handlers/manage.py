@@ -309,18 +309,34 @@ async def cb_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         msg = get_config("payment_confirmed_message",
                          "🎉 <b>Payment Confirmed!</b>\n\nYour premium access has been activated. Welcome! 🌟")
-        try:
-            await context.bot.send_message(chat_id=payment["user_id"], text=msg, parse_mode="HTML")
-        except Exception:
-            pass
+        
+        # Add join link button if configured
+        reply_markup_user = None
+        jlink = get_config("join_link", "")
+        if jlink:
+            reply_markup_user = InlineKeyboardMarkup([[
+                InlineKeyboardButton("🔗 JOIN NOW", url=jlink)
+            ]])
 
         try:
+            await context.bot.send_message(
+                chat_id=payment["user_id"], 
+                text=msg, 
+                parse_mode="HTML",
+                reply_markup=reply_markup_user
+            )
+        except Exception as e:
+            logger.error(f"Failed to send confirmation to user {payment['user_id']}: {e}")
+
+        try:
+            # Clear buttons on admin side
             await query.edit_message_caption(
                 (query.message.caption or "") + "\n\n✅ <b>APPROVED</b>",
-                parse_mode="HTML"
+                parse_mode="HTML",
+                reply_markup=None
             )
         except Exception:
-            await query.edit_message_text("✅ Payment approved.")
+            await query.edit_message_text("✅ Payment approved.", reply_markup=None)
     except Exception as e:
         logger.error(f"cb_approve error: {e}")
         await query.answer("Error approving. Try again.", show_alert=True)
@@ -361,12 +377,14 @@ async def cb_reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
             pass
 
         try:
+            # Clear buttons on admin side
             await query.edit_message_caption(
                 (query.message.caption or "") + "\n\n❌ <b>REJECTED</b>",
-                parse_mode="HTML"
+                parse_mode="HTML",
+                reply_markup=None
             )
         except Exception:
-            await query.edit_message_text("❌ Payment rejected.")
+            await query.edit_message_text("❌ Payment rejected.", reply_markup=None)
     except Exception as e:
         logger.error(f"cb_reject error: {e}")
         await query.answer("Error rejecting. Try again.", show_alert=True)
