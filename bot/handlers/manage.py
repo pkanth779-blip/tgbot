@@ -289,6 +289,10 @@ async def cb_payments(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cb_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+    if not is_admin(update.effective_user.id):
+        await query.answer("⛔ Access denied.", show_alert=True)
+        return
+
     await query.answer("Processing…")
     payment_id = query.data.split("_", 2)[2]
 
@@ -329,14 +333,23 @@ async def cb_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.error(f"Failed to send confirmation to user {payment['user_id']}: {e}")
 
         try:
-            # Clear buttons on admin side
+            # Clear buttons and update caption on admin side
+            new_caption = (query.message.caption or "") + "\n\n✅ <b>APPROVED</b>"
             await query.edit_message_caption(
-                (query.message.caption or "") + "\n\n✅ <b>APPROVED</b>",
+                caption=new_caption,
                 parse_mode="HTML",
                 reply_markup=None
             )
-        except Exception:
-            await query.edit_message_text("✅ Payment approved.", reply_markup=None)
+        except Exception as e:
+            logger.warning(f"edit_message_caption failed: {e}")
+            try:
+                await query.edit_message_text(text="✅ Payment approved.", reply_markup=None)
+            except Exception:
+                # Last resort: just remove buttons
+                try:
+                    await query.edit_message_reply_markup(reply_markup=None)
+                except Exception:
+                    pass
     except Exception as e:
         logger.error(f"cb_approve error: {e}")
         await query.answer("Error approving. Try again.", show_alert=True)
@@ -345,6 +358,10 @@ async def cb_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cb_reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
+    if not is_admin(update.effective_user.id):
+        await query.answer("⛔ Access denied.", show_alert=True)
+        return
+
     await query.answer("Processing…")
     payment_id = query.data.split("_", 2)[2]
 
@@ -377,14 +394,22 @@ async def cb_reject(update: Update, context: ContextTypes.DEFAULT_TYPE):
             pass
 
         try:
-            # Clear buttons on admin side
+            # Clear buttons and update caption on admin side
+            new_caption = (query.message.caption or "") + "\n\n❌ <b>REJECTED</b>"
             await query.edit_message_caption(
-                (query.message.caption or "") + "\n\n❌ <b>REJECTED</b>",
+                caption=new_caption,
                 parse_mode="HTML",
                 reply_markup=None
             )
-        except Exception:
-            await query.edit_message_text("❌ Payment rejected.", reply_markup=None)
+        except Exception as e:
+            logger.warning(f"edit_message_caption failed: {e}")
+            try:
+                await query.edit_message_text(text="❌ Payment rejected.", reply_markup=None)
+            except Exception:
+                try:
+                    await query.edit_message_reply_markup(reply_markup=None)
+                except Exception:
+                    pass
     except Exception as e:
         logger.error(f"cb_reject error: {e}")
         await query.answer("Error rejecting. Try again.", show_alert=True)
